@@ -1,0 +1,9 @@
+mtcnn
+keras-facenet
+tensorflow
+opencv-python
+flask
+scikit-learn
+numpy
+Pillow
+flask

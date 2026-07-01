@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FaceAttend AI</title>
+  <style>
+    /* ── Reset & Base ─────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0f0f14;
+      color: #e2e2e8;
+      min-height: 100vh;
+    }
+
+    /* ── Header ───────────────────────────────────────────────────────────── */
+    header {
+      background: #16161f;
+      border-bottom: 1px solid #2a2a38;
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #6c63ff, #3ecfcf);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+    .logo h1 { font-size: 17px; font-weight: 600; color: #fff; }
+    .logo span { font-size: 11px; color: #888; margin-left: 2px; }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    #live-clock {
+      font-size: 13px;
+      color: #888;
+      font-variant-numeric: tabular-nums;
+    }
+    .pill {
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      border: 1px solid #2a2a38;
+      color: #888;
+    }
+    .pill.active { border-color: #3ecfcf44; color: #3ecfcf; background: #3ecfcf11; }
+
+    /* ── Main Layout ──────────────────────────────────────────────────────── */
+    main {
+      display: grid;
+      grid-template-columns: 440px 1fr;
+      gap: 20px;
+      padding: 20px 28px;
+      max-width: 1300px;
+      margin: auto;
+    }
+
+    /* ── Card ─────────────────────────────────────────────────────────────── */
+    .card {
+      background: #16161f;
+      border: 1px solid #2a2a38;
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 14px 18px;
+      border-bottom: 1px solid #2a2a38;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-header h2 {
+      font-size: 13px;
+      font-weight: 500;
+      color: #a0a0b8;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .card-body { padding: 18px; }
+
+    /* ── Camera Panel ─────────────────────────────────────────────────────── */
+    .camera-wrap {
+      position: relative;
+      background: #0a0a10;
+      border-radius: 10px;
+      overflow: hidden;
+      aspect-ratio: 4/3;
+    }
+    #video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transform: scaleX(-1);   /* mirror effect */
+    }
+    #overlay-canvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      pointer-events: none;
+      transform: scaleX(-1);
+    }
+    .camera-off-msg {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      color: #555;
+      font-size: 13px;
+    }
+    .camera-off-msg span { font-size: 32px; }
+
+    /* ── Status Box ────────────────────────────────────────────────────────── */
+    #status-box {
+      margin-top: 14px;
+      padding: 14px 16px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #1e1e2a;
+      border: 1px solid #2a2a38;
+      transition: background 0.3s, border-color 0.3s;
+      min-height: 58px;
+    }
+    #status-box.recognized { background: #0e2a1a; border-color: #1a5c3044; }
+    #status-box.unknown    { background: #2a1010; border-color: #5c1a1a44; }
+    #status-box .status-icon { font-size: 22px; flex-shrink: 0; }
+    #status-name { font-size: 15px; font-weight: 600; color: #fff; }
+    #status-sub  { font-size: 12px; color: #888; margin-top: 2px; }
+
+    /* ── Control Buttons ──────────────────────────────────────────────────── */
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    button {
+      flex: 1;
+      padding: 10px 14px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    button:active { transform: scale(0.97); }
+    #btn-start {
+      background: linear-gradient(135deg, #6c63ff, #3ecfcf);
+      color: #fff;
+    }
+    #btn-start.running {
+      background: #c0392b;
+    }
+    #btn-clear {
+      background: #1e1e2a;
+      border: 1px solid #2a2a38;
+      color: #888;
+    }
+    #btn-clear:hover { color: #ccc; border-color: #444; }
+
+    /* ── Stats Row ────────────────────────────────────────────────────────── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .stat-card {
+      background: #1e1e2a;
+      border: 1px solid #2a2a38;
+      border-radius: 10px;
+      padding: 12px;
+      text-align: center;
+    }
+    .stat-card .val {
+      font-size: 26px;
+      font-weight: 700;
+      color: #fff;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-card .lbl {
+      font-size: 11px;
+      color: #666;
+      margin-top: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* ── Table ────────────────────────────────────────────────────────────── */
+    .table-scroll {
+      max-height: 420px;
+      overflow-y: auto;
+      border-radius: 8px;
+      border: 1px solid #2a2a38;
+    }
+    .table-scroll::-webkit-scrollbar { width: 4px; }
+    .table-scroll::-webkit-scrollbar-track { background: transparent; }
+    .table-scroll::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    thead {
+      position: sticky;
+      top: 0;
+      background: #1a1a24;
+      z-index: 1;
+    }
+    th {
+      padding: 10px 14px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 500;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border-bottom: 1px solid #2a2a38;
+    }
+    td {
+      padding: 11px 14px;
+      border-bottom: 1px solid #1e1e2a;
+      color: #c0c0d0;
+      vertical-align: middle;
+    }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: #1e1e28; }
+
+    .name-cell {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #6c63ff44, #3ecfcf44);
+      border: 1px solid #6c63ff55;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 600;
+      color: #a090ff;
+      flex-shrink: 0;
+      text-transform: uppercase;
+    }
+    .badge-present {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 20px;
+      background: #0e2a1a;
+      color: #3ecf88;
+      border: 1px solid #1a5c3044;
+    }
+    .dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: #3ecf88;
+      display: inline-block;
+    }
+
+    .empty-row td {
+      text-align: center;
+      color: #444;
+      padding: 40px;
+    }
+
+    /* ── Filter Bar ───────────────────────────────────────────────────────── */
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    #filter-date {
+      background: #1e1e2a;
+      border: 1px solid #2a2a38;
+      border-radius: 8px;
+      color: #c0c0d0;
+      padding: 6px 10px;
+      font-size: 12px;
+      outline: none;
+    }
+    #filter-date:focus { border-color: #6c63ff; }
+    #btn-filter-clear {
+      background: transparent;
+      border: 1px solid #2a2a38;
+      color: #666;
+      padding: 6px 12px;
+      font-size: 12px;
+      border-radius: 8px;
+      flex: unset;
+    }
+    #btn-filter-clear:hover { color: #ccc; }
+    .record-count {
+      font-size: 11px;
+      color: #555;
+      margin-left: auto;
+    }
+
+    /* ── Toast ────────────────────────────────────────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #222230;
+      border: 1px solid #3a3a50;
+      border-radius: 10px;
+      padding: 12px 18px;
+      font-size: 13px;
+      color: #e0e0f0;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.25s, transform 0.25s;
+      pointer-events: none;
+      max-width: 300px;
+      z-index: 100;
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+    #toast.success { border-color: #1a5c3044; color: #3ecf88; }
+    #toast.warning { border-color: #5c3a1044; color: #f0a040; }
+
+    /* ── Responsive ───────────────────────────────────────────────────────── */
+    @media (max-width: 900px) {
+      main { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────────────── -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">👁</div>
+    <div>
+      <h1>FaceAttend AI</h1>
+      <span>Automated Attendance System</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <span id="live-clock">--:--:--</span>
+    <span class="pill" id="system-pill">Idle</span>
+  </div>
+</header>
+
+<!-- ── Hidden canvas for frame capture (not shown to user) ─────────────────── -->
+<canvas id="capture-canvas" style="display:none;"></canvas>
+
+<!-- ── Main ────────────────────────────────────────────────────────────────── -->
+<main>
+
+  <!-- Left: Camera + Controls -->
+  <div>
+    <div class="card">
+      <div class="card-header">
+        <h2>Live Camera</h2>
+        <span class="pill" id="cam-pill">Camera off</span>
+      </div>
+      <div class="card-body">
+
+        <div class="camera-wrap">
+          <video id="video" autoplay muted playsinline></video>
+          <canvas id="overlay-canvas"></canvas>
+          <div class="camera-off-msg" id="cam-off-msg">
+            <span>📷</span>
+            Camera not started
+          </div>
+        </div>
+
+        <!-- Status -->
+        <div id="status-box">
+          <span class="status-icon" id="status-icon">⏳</span>
+          <div>
+            <div id="status-name">Waiting...</div>
+            <div id="status-sub">Start recognition to begin</div>
+          </div>
+        </div>
+
+        <!-- Buttons -->
+        <div class="btn-row">
+          <button id="btn-start" onclick="toggleRecognition()">▶ Start Recognition</button>
+          <button id="btn-clear" onclick="clearAttendance()">🗑 Clear Records</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Dashboard -->
+  <div>
+    <div class="card">
+      <div class="card-header">
+        <h2>Attendance Dashboard</h2>
+        <span class="pill active" id="refresh-pill">Live</span>
+      </div>
+      <div class="card-body">
+
+        <!-- Stats -->
+        <div class="stats-row">
+          <div class="stat-card">
+            <div class="val" id="stat-today">0</div>
+            <div class="lbl">Today</div>
+          </div>
+          <div class="stat-card">
+            <div class="val" id="stat-total">0</div>
+            <div class="lbl">All time</div>
+          </div>
+          <div class="stat-card">
+            <div class="val" id="stat-employees">0</div>
+            <div class="lbl">Employees</div>
+          </div>
+        </div>
+
+        <!-- Filter -->
+        <div class="filter-bar">
+          <input type="date" id="filter-date" onchange="filterByDate()" />
+          <button id="btn-filter-clear" onclick="clearFilter()">✕ Clear</button>
+          <span class="record-count" id="record-count"></span>
+        </div>
+
+        <!-- Table -->
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="table-body">
+              <tr class="empty-row">
+                <td colspan="4">No attendance records yet</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ── Toast ────────────────────────────────────────────────────────────────── -->
+<div id="toast"></div>
+
+<script>
+  // ── State ──────────────────────────────────────────────────────────────────
+  let running       = false;
+  let intervalId    = null;
+  let allRecords    = [];
+  let activeFilter  = null;
+
+  const video          = document.getElementById("video");
+  const captureCanvas  = document.getElementById("capture-canvas");
+  const overlayCanvas  = document.getElementById("overlay-canvas");
+  const octx           = overlayCanvas.getContext("2d");
+  const statusBox      = document.getElementById("status-box");
+  const statusIcon     = document.getElementById("status-icon");
+  const statusName     = document.getElementById("status-name");
+  const statusSub      = document.getElementById("status-sub");
+  const btnStart       = document.getElementById("btn-start");
+  const systemPill     = document.getElementById("system-pill");
+  const camPill        = document.getElementById("cam-pill");
+  const camOffMsg      = document.getElementById("cam-off-msg");
+
+  // ── Clock ──────────────────────────────────────────────────────────────────
+  function updateClock() {
+    document.getElementById("live-clock").textContent =
+      new Date().toLocaleTimeString();
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // ── Camera ─────────────────────────────────────────────────────────────────
+  async function startCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: 640, height: 480 }
+      });
+      video.srcObject = stream;
+      camOffMsg.style.display = "none";
+      camPill.textContent = "Camera on";
+      camPill.classList.add("active");
+    } catch (err) {
+      setStatus("", "❌", "Camera denied", err.message);
+    }
+  }
+  startCamera();
+
+  // ── Recognition toggle ─────────────────────────────────────────────────────
+  function toggleRecognition() {
+    if (!running) {
+      running = true;
+      btnStart.textContent = "■ Stop Recognition";
+      btnStart.classList.add("running");
+      systemPill.textContent = "Running";
+      systemPill.classList.add("active");
+      intervalId = setInterval(sendFrame, 2000);   // every 2 seconds
+    } else {
+      running = false;
+      btnStart.textContent = "▶ Start Recognition";
+      btnStart.classList.remove("running");
+      systemPill.textContent = "Idle";
+      systemPill.classList.remove("active");
+      clearInterval(intervalId);
+      setStatus("", "⏹", "Stopped", "Recognition paused");
+      clearOverlay();
+    }
+  }
+
+  // ── Capture + send frame ───────────────────────────────────────────────────
+  function sendFrame() {
+    if (!video.videoWidth) return;   // camera not ready yet
+
+    captureCanvas.width  = video.videoWidth;
+    captureCanvas.height = video.videoHeight;
+    const ctx = captureCanvas.getContext("2d");
+    ctx.drawImage(video, 0, 0);
+
+    // Mirror the frame so faces aren't flipped (video is CSS-mirrored)
+    ctx.save();
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, -video.videoWidth, 0);
+    ctx.restore();
+
+    const imageData = captureCanvas.toDataURL("image/jpeg", 0.85);
+
+    fetch("/recognize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image: imageData })
+    })
+    .then(r => r.json())
+    .then(handleResult)
+    .catch(err => setStatus("", "⚠", "Network error", err.message));
+  }
+
+  // ── Handle recognition result ──────────────────────────────────────────────
+  function handleResult(data) {
+    if (data.status === "recognized") {
+      const pct  = (data.score * 100).toFixed(1);
+      const note = data.marked
+        ? `✓ Attendance marked  —  ${pct}% match`
+        : `Already marked today  —  ${pct}% match`;
+
+      setStatus("recognized", "✅", data.name, note);
+      drawBox("#22cc66");
+
+      if (data.marked) {
+        loadAttendance();
+        showToast(`${data.name} marked present`, "success");
+      }
+
+    } else if (data.status === "unknown") {
+      const pct = (data.score * 100).toFixed(1);
+      setStatus("unknown", "❓", "Unknown person", `Best match: ${pct}%`);
+      drawBox("#cc2222");
+
+    } else if (data.status === "no_face") {
+      setStatus("", "🔍", "Scanning...", "No face detected in frame");
+      clearOverlay();
+    }
+  }
+
+  // ── Status box ─────────────────────────────────────────────────────────────
+  function setStatus(cls, icon, name, sub) {
+    statusBox.className   = cls;
+    statusIcon.textContent = icon;
+    statusName.textContent = name;
+    statusSub.textContent  = sub;
+  }
+
+  // ── Overlay box on video ───────────────────────────────────────────────────
+  function drawBox(color) {
+    overlayCanvas.width  = video.offsetWidth;
+    overlayCanvas.height = video.offsetHeight;
+    const margin = 40;
+    const w = overlayCanvas.width  - margin * 2;
+    const h = overlayCanvas.height - margin * 2;
+    octx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+    octx.strokeStyle = color;
+    octx.lineWidth   = 2;
+    octx.strokeRect(margin, margin, w, h);
+  }
+  function clearOverlay() {
+    octx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+  }
+
+  // ── Attendance table ───────────────────────────────────────────────────────
+  function loadAttendance() {
+    fetch("/attendance")
+      .then(r => r.json())
+      .then(records => {
+        allRecords = records;
+        renderTable(activeFilter ? records.filter(r => r.date === activeFilter) : records);
+        updateStats(records);
+      });
+  }
+
+  function renderTable(records) {
+    const tbody = document.getElementById("table-body");
+    document.getElementById("record-count").textContent =
+      records.length + " record" + (records.length !== 1 ? "s" : "");
+
+    if (records.length === 0) {
+      tbody.innerHTML = `<tr class="empty-row"><td colspan="4">No records found</td></tr>`;
+      return;
+    }
+
+    const sorted = [...records].reverse();   // newest first
+    tbody.innerHTML = sorted.map(r => {
+      const initials = r.name.slice(0, 2).toUpperCase();
+      return `
+        <tr>
+          <td>
+            <div class="name-cell">
+              <div class="avatar">${initials}</div>
+              <strong>${r.name}</strong>
+            </div>
+          </td>
+          <td>${formatDate(r.date)}</td>
+          <td>${r.time}</td>
+          <td><span class="badge-present"><span class="dot"></span>Present</span></td>
+        </tr>
+      `;
+    }).join("");
+  }
+
+  function updateStats(records) {
+    const today      = new Date().toISOString().split("T")[0];
+    const todayCount = records.filter(r => r.date === today).length;
+    const empCount   = new Set(records.map(r => r.name)).size;
+
+    document.getElementById("stat-today").textContent     = todayCount;
+    document.getElementById("stat-total").textContent     = records.length;
+    document.getElementById("stat-employees").textContent = empCount;
+  }
+
+  function filterByDate() {
+    activeFilter = document.getElementById("filter-date").value || null;
+    const filtered = activeFilter
+      ? allRecords.filter(r => r.date === activeFilter)
+      : allRecords;
+    renderTable(filtered);
+  }
+
+  function clearFilter() {
+    document.getElementById("filter-date").value = "";
+    activeFilter = null;
+    renderTable(allRecords);
+    document.getElementById("record-count").textContent =
+      allRecords.length + " record" + (allRecords.length !== 1 ? "s" : "");
+  }
+
+  function formatDate(iso) {
+    const [y, m, d] = iso.split("-");
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return `${d} ${months[parseInt(m) - 1]} ${y}`;
+  }
+
+  // ── Clear attendance ───────────────────────────────────────────────────────
+  function clearAttendance() {
+    if (!confirm("Clear all attendance records? This cannot be undone.")) return;
+    fetch("/clear", { method: "POST" })
+      .then(() => {
+        allRecords = [];
+        renderTable([]);
+        updateStats([]);
+        showToast("All records cleared", "warning");
+      });
+  }
+
+  // ── Toast ──────────────────────────────────────────────────────────────────
+  let toastTimer = null;
+  function showToast(msg, type = "") {
+    const el = document.getElementById("toast");
+    el.textContent = msg;
+    el.className   = "show " + type;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.className = "", 3000);
+  }
+
+  // ── Initial load ───────────────────────────────────────────────────────────
+  loadAttendance();
+  setInterval(loadAttendance, 10000);   // auto-refresh every 10s
+</script>
+</body>
+</html>
