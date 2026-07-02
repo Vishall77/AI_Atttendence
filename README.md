@@ -124,6 +124,6 @@ and automatically mark attendance.
 
 ## Tuning
 
-Edit `THRESHOLD` in `app.py` (default `0.8`):
+Edit `THRESHOLD` in `app.py` (default `0.7`):
 - Higher (e.g. `0.85`) → stricter matching, fewer false positives
-- Lower  (e.g. `0.75`) → more lenient, better in bad lighting
+- Lower  (e.g. `0.6`) → more lenient, better in bad lighting
